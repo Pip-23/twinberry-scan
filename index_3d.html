@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Twinberry - Prova Occhiali 3D</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: black;
+    }
+    canvas, video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+    #backButton {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: white;
+      padding: 10px 20px;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+</head>
+<body>
+  <button id="backButton" onclick="window.location.href='https://sangiofil5.wixsite.com/twinberry';">⬅ Torna al sito</button>
+  <video id="input_video" autoplay muted playsinline></video>
+  <canvas id="threeCanvas"></canvas>
+
+  <script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('threeCanvas');
+
+    // Setup Three.js
+    const scene = new THREE.Scene();
+    const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({canvas: canvasElement, alpha: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Montatura fittizia: un cubo
+    const geometry = new THREE.BoxGeometry(0.1, 0.05, 0.05);
+    const material = new THREE.MeshBasicMaterial({color: 0x00ffff});
+    const glasses = new THREE.Mesh(geometry, material);
+    scene.add(glasses);
+    camera3D.position.z = 1;
+
+    // Funzione per aggiornare posizione 3D in base ai landmark
+    function updateGlassesPosition(landmarks) {
+      const leftEye = landmarks[33];  // punto occhio sinistro
+      const rightEye = landmarks[263];  // punto occhio destro
+      const centerX = (leftEye.x + rightEye.x) / 2;
+      const centerY = (leftEye.y + rightEye.y) / 2;
+      const centerZ = (leftEye.z + rightEye.z) / 2;
+
+      glasses.position.set(centerX - 0.5, -(centerY - 0.5), -centerZ);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera3D);
+    }
+    animate();
+
+    // Setup MediaPipe
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults(results => {
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        updateGlassesPosition(results.multiFaceLandmarks[0]);
+      }
+    });
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await faceMesh.send({image: videoElement});
+      },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  </script>
+</body>
+</html>
